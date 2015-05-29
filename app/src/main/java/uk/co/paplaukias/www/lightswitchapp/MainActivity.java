@@ -20,7 +20,10 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ImageButton;
+import android.widget.RelativeLayout;
 import android.widget.Toast;
+
+import static uk.co.paplaukias.www.lightswitchapp.R.id.imageButton;
 
 
 public class MainActivity extends ActionBarActivity{
@@ -45,6 +48,10 @@ public class MainActivity extends ActionBarActivity{
     private static final String TAG = "BluetoothActivity";
 
     private ImageButton mSwitch1;
+    private ImageButton mLevel1;
+
+    RelativeLayout rlLayout = (RelativeLayout) this.findViewById(R.id.rlLayout);
+
     //private Switch mSwitch2;
     private MenuItem connectButton;
     Menu menu;
@@ -62,6 +69,9 @@ public class MainActivity extends ActionBarActivity{
         //initialise switches for light control
         mSwitch1 = (ImageButton) findViewById(R.id.imageButton);
         //mSwitch2 = (Switch) findViewById(R.id.switch2);
+
+        //initialise trash level for the waste bin
+        mLevel1 = (ImageButton) findViewById(R.id.imageButton);
 
         //if device is not connected to the light controller then disable the interface
         setInterfaceEnabled(false);
@@ -234,143 +244,154 @@ public class MainActivity extends ActionBarActivity{
     from the light controller
     It runs in the background, thus if need to make changes to the UI, use runOnUiThread()
      */
-    private BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
-        @Override
-        public void onConnectionStateChange(BluetoothGatt gatt, int status, final int newState) {
-            super.onConnectionStateChange(gatt, status, newState);
+    private BluetoothGattCallback mGattCallback;
 
-            if (newState == BluetoothProfile.STATE_CONNECTED) {
-                // Connected to the light controller
-                Log.i(TAG, "Connected to GATT server.");
-                mConnected = true;
-                if (mGatt.discoverServices()) {
-                    Log.d(TAG, "Started service discovery.");
-                } else {
-                    Log.w(TAG, "Service discovery failed.");
-                }
+    {
+        mGattCallback = new BluetoothGattCallback() {
+            @Override
+            public void onConnectionStateChange(BluetoothGatt gatt, int status, final int newState) {
+                super.onConnectionStateChange(gatt, status, newState);
 
-            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                // Disconnected from the light controller
-                Log.i(TAG, "Disconnected from GATT server.");
-                mConnected = false;
-            }
-
-            // Update the UI
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    if(mConnected){
-                        updateMenuButton(DISCONNECT_STATE);
-                        Toast.makeText(MainActivity.this, "Connected to the Light Controller", Toast.LENGTH_SHORT).show();
-                    }else{
-                        updateMenuButton(CONNECT_STATE);
-                        Toast.makeText(MainActivity.this, "Disconnected from the Light Controller", Toast.LENGTH_SHORT).show();
+                if (newState == BluetoothProfile.STATE_CONNECTED) {
+                    // Connected to the light controller
+                    Log.i(TAG, "Connected to GATT server.");
+                    mConnected = true;
+                    if (mGatt.discoverServices()) {
+                        Log.d(TAG, "Started service discovery.");
+                    } else {
+                        Log.w(TAG, "Service discovery failed.");
                     }
-                }
-            });
-        }
 
-        @Override
-        public void onServicesDiscovered(BluetoothGatt gatt, int status) {
-            super.onServicesDiscovered(gatt, status);
-            BluetoothGattService lightControlService = gatt.getService(AssignedNumber.getBleUuid("Light Control"));
-            if (lightControlService != null) {
-                // Light control services were discovered
-                lightSwitchWriteCharacteristic = lightControlService.getCharacteristic(AssignedNumber.getBleUuid("Light Switches Write"));
-                if (lightSwitchWriteCharacteristic != null) {
-                    Log.i(TAG, "Found light switch characteristic.");
-                } else {
-                    Log.w(TAG, "Can't find light switch write characteristic.");
+                } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                    // Disconnected from the light controller
+                    Log.i(TAG, "Disconnected from GATT server.");
+                    mConnected = false;
                 }
-                lightSwitchReadCharacteristic = lightControlService.getCharacteristic(AssignedNumber.getBleUuid("Light Switches Read"));
-                if (lightSwitchReadCharacteristic != null) {
-                    Log.i(TAG, "Found light switch characteristic.");
-                    mGatt.setCharacteristicNotification(lightSwitchReadCharacteristic, true);
-                    BluetoothGattDescriptor descriptor = lightSwitchReadCharacteristic.getDescriptor(AssignedNumber.getBleUuid("Client Characteristic Configuration"));
-                    descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-                    mGatt.writeDescriptor(descriptor);
-                } else {
-                    Log.w(TAG, "Can't find light switch read characteristic.");
-                }
+
+                // Update the UI
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        setInterfaceEnabled(true);
-                    }
-                });
-
-            } else {
-                // Light control services were not discovered
-                Log.w(TAG, "Can't find light control service.");
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        setInterfaceEnabled(false);
-                        Toast.makeText(MainActivity.this, "Can't find Light Controller services", Toast.LENGTH_SHORT).show();
-                    }
-                });
-            }
-        }
-
-        @Override
-        public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
-            super.onCharacteristicRead(gatt, characteristic, status);
-            Log.i(TAG, "onCharacteristicRead Entered");
-        }
-
-        @Override
-        public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
-            super.onCharacteristicChanged(gatt, characteristic);
-            if (characteristic.getUuid().equals(AssignedNumber.getBleUuid("Light Switches Read"))) {
-                final int lightSwitchState = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, 0);
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        switch (lightSwitchState){
-                            case 0:
-                                mSwitch1.setImageResource(R.drawable.on);
-                                lightsOn = false;
-                                //mSwitch2.setChecked(false);
-                                break;
-
-                            case 1:
-                                mSwitch1.setImageResource(R.drawable.off);
-                                lightsOn = true;
-                                //mSwitch2.setChecked(false);
-                                break;
-
-                            case 2:
-                                mSwitch1.setImageResource(R.drawable.on);
-                                lightsOn = false;
-                                //mSwitch2.setChecked(true);
-                                break;
-
-                            case 3:
-                                mSwitch1.setImageResource(R.drawable.off);
-                                lightsOn = true;
-                                //mSwitch2.setChecked(true);
-                                break;
-
-                            default:
-                                mSwitch1.setImageResource(R.drawable.on);
-                                lightsOn = false;
-                                //mSwitch2.setChecked(false);
-                                break;
+                        if (mConnected) {
+                            updateMenuButton(DISCONNECT_STATE);
+                            Toast.makeText(MainActivity.this, "Connected to the Light Controller", Toast.LENGTH_SHORT).show();
+                        } else {
+                            updateMenuButton(CONNECT_STATE);
+                            Toast.makeText(MainActivity.this, "Disconnected from the Light Controller", Toast.LENGTH_SHORT).show();
                         }
                     }
                 });
             }
-        }
 
-        public void onCharacteristicWrite(BluetoothGatt gatt,
-                                          BluetoothGattCharacteristic characteristic, int status) {
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                Log.v(TAG, "Successfully written.");
-            } else {
-                Log.w(TAG, "Write failed with code " + status + ".");
+            @Override
+            public void onServicesDiscovered(BluetoothGatt gatt, int status) {
+                super.onServicesDiscovered(gatt, status);
+                BluetoothGattService lightControlService = gatt.getService(AssignedNumber.getBleUuid("Light Control"));
+                if (lightControlService != null) {
+                    // Light control services were discovered
+                    lightSwitchWriteCharacteristic = lightControlService.getCharacteristic(AssignedNumber.getBleUuid("Light Switches Write"));
+                    if (lightSwitchWriteCharacteristic != null) {
+                        Log.i(TAG, "Found light switch characteristic.");
+                    } else {
+                        Log.w(TAG, "Can't find light switch write characteristic.");
+                    }
+                    lightSwitchReadCharacteristic = lightControlService.getCharacteristic(AssignedNumber.getBleUuid("Light Switches Read"));
+                    if (lightSwitchReadCharacteristic != null) {
+                        Log.i(TAG, "Found light switch characteristic.");
+                        mGatt.setCharacteristicNotification(lightSwitchReadCharacteristic, true);
+                        BluetoothGattDescriptor descriptor = lightSwitchReadCharacteristic.getDescriptor(AssignedNumber.getBleUuid("Client Characteristic Configuration"));
+                        descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+                        mGatt.writeDescriptor(descriptor);
+                    } else {
+                        Log.w(TAG, "Can't find light switch read characteristic.");
+                    }
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            setInterfaceEnabled(true);
+                        }
+                    });
+
+                } else {
+                    // Light control services were not discovered
+                    Log.w(TAG, "Can't find light control service.");
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            setInterfaceEnabled(false);
+                            Toast.makeText(MainActivity.this, "Can't find Light Controller services", Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
             }
-        }
-    };
+
+            @Override
+            public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+                super.onCharacteristicRead(gatt, characteristic, status);
+                Log.i(TAG, "onCharacteristicRead Entered");
+            }
+
+            @Override
+            public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
+                super.onCharacteristicChanged(gatt, characteristic);
+                if (characteristic.getUuid().equals(AssignedNumber.getBleUuid("Light Switches Read"))) {
+                    //final int lightSwitchState = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, 0);
+                    final int trashLevel = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, 0);
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            switch (trashLevel) {
+                                case 0:
+                                    //if trash level is low, show image with green level bin
+                                    if (trashLevel == 1)
+                                        mLevel1.setImageResource(R.drawable.low);
+                                    //lightsOn = false;
+                                    //mSwitch2.setChecked(false);
+                                    break;
+
+                                case 1:
+                                    //if trash level is medium,set image to medium bin level image
+                                    if (trashLevel == 2)
+                                        mLevel1.setImageResource(R.drawable.medium);
+                                    //lightsOn = true;
+                                    //mSwitch2.setChecked(false);
+                                    break;
+
+                                case 2:
+                                    //if trash level is high, set the image to high level image and also send push notification
+                                    if (trashLevel == 3)
+                                        mLevel1.setImageResource(R.drawable.high);
+                                    //lightsOn = false;
+                                    //mSwitch2.setChecked(true);
+                                    break;
+
+                                case 3:
+                                    mSwitch1.setImageResource(R.drawable.off);
+                                    lightsOn = true;
+                                    //mSwitch2.setChecked(true);
+                                    break;
+
+                                default:
+                                    mSwitch1.setImageResource(R.drawable.on);
+                                    lightsOn = false;
+                                    //mSwitch2.setChecked(false);
+                                    break;
+                            }
+                        }
+                    });
+                }
+            }
+
+            public void onCharacteristicWrite(BluetoothGatt gatt,
+                                              BluetoothGattCharacteristic characteristic, int status) {
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    Log.v(TAG, "Successfully written.");
+                } else {
+                    Log.w(TAG, "Write failed with code " + status + ".");
+                }
+            }
+        };
+    }
 
     public void onSwitch1Click(View view) {
         lightSwitchWriteCharacteristic.setValue(new byte[] { 1 });
