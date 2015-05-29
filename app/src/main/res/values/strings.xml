@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">Light Controller</string>
+
+    <string name="hello_world">Hello world!</string>
+    <string name="action_settings">Settings</string>
+    <string name="connect">Connect</string>
+    <string name="scanning">Scanning</string>
+    <string name="connecting">Connecting…</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="cancel">Cancel</string>
+    <string name="select_device">Select device:</string>
+    <string name="unknown_device_name">Unknown device</string>
+    <string name="socket1">Light 1</string>
+    <string name="socket2">Light 2</string>
+    <string name="lightSwitch1">lightSwitch1</string>
+    <string name="lightOn">Light is ON</string>
+    <string name="lightOff">Light is OFF</string>
+    <string name="lightSwitchText">Light Switch</string>
+</resources>
