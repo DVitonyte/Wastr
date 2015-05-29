@@ -12,6 +12,7 @@ import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.nfc.Tag;
 import android.os.Handler;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
@@ -20,13 +21,20 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.RelativeLayout;
+import android.widget.TextView;
 import android.widget.Toast;
+
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.UUID;
 
 import static uk.co.paplaukias.www.lightswitchapp.R.id.imageButton;
 
 
 public class MainActivity extends ActionBarActivity{
+
     BluetoothGattCharacteristic lightSwitchWriteCharacteristic;
     BluetoothGattCharacteristic lightSwitchReadCharacteristic;
     private BluetoothAdapter mBluetoothAdapter;
@@ -38,6 +46,7 @@ public class MainActivity extends ActionBarActivity{
     boolean mScanning;
     boolean lightsOn;
 
+
     private static final int SCAN_PERIOD = 5000;
     private static final int REQUEST_ENABLE_BT = 1;
     private static final int CONNECT_STATE = 0;
@@ -48,9 +57,34 @@ public class MainActivity extends ActionBarActivity{
     private static final String TAG = "BluetoothActivity";
 
     private ImageButton mSwitch1;
-    private ImageButton mLevel1;
+    private ImageView mLevel1;
+    private ImageView mWelcome;
+    private TextView mSensorData;
+    private int distance;
+    private float light;
 
-    RelativeLayout rlLayout = (RelativeLayout) this.findViewById(R.id.rlLayout);
+    private Timer timer = new Timer();
+
+    private TimerTask updateInfo = new TimerTask() {
+        @Override
+        public void run() {
+            runOnUiThread(new Runnable(){
+                @Override
+                public void run(){
+                    lightSwitchWriteCharacteristic.setValue("d");
+                    mGatt.writeCharacteristic(lightSwitchWriteCharacteristic);
+                    distance = Integer.parseInt(lightSwitchWriteCharacteristic.getStringValue(0));
+
+                    lightSwitchWriteCharacteristic.setValue("l");
+                    mGatt.writeCharacteristic(lightSwitchWriteCharacteristic);
+                    light = Float.parseFloat(lightSwitchWriteCharacteristic.getStringValue(0));
+                }
+            });
+
+        }
+    };
+
+    //RelativeLayout rlLayout = (RelativeLayout) this.findViewById(R.id.rlLayout);
 
     //private Switch mSwitch2;
     private MenuItem connectButton;
@@ -65,13 +99,17 @@ public class MainActivity extends ActionBarActivity{
         mScanning = false;
         mConnected = false;
         mMenuCreated = false;
+        mSensorData = (TextView) findViewById(R.id.editText);
 
         //initialise switches for light control
         mSwitch1 = (ImageButton) findViewById(R.id.imageButton);
         //mSwitch2 = (Switch) findViewById(R.id.switch2);
 
         //initialise trash level for the waste bin
-        mLevel1 = (ImageButton) findViewById(R.id.imageButton);
+        mLevel1 = (ImageView) findViewById(R.id.image);
+
+        //initialise welcome screen
+        mWelcome = (ImageView) findViewById(R.id.image);
 
         //if device is not connected to the light controller then disable the interface
         setInterfaceEnabled(false);
@@ -274,36 +312,40 @@ public class MainActivity extends ActionBarActivity{
                     public void run() {
                         if (mConnected) {
                             updateMenuButton(DISCONNECT_STATE);
-                            Toast.makeText(MainActivity.this, "Connected to the Light Controller", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(MainActivity.this, "Connected to you waste bins", Toast.LENGTH_SHORT).show();
                         } else {
                             updateMenuButton(CONNECT_STATE);
-                            Toast.makeText(MainActivity.this, "Disconnected from the Light Controller", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(MainActivity.this, "Disconnected from your waste bins", Toast.LENGTH_SHORT).show();
                         }
                     }
                 });
             }
 
+            //public static final UUID RX_SERVICE_UUID = UUID.fromString("6e400001-b5a3-f393-e0a9-e50e24dcca9e");
+            //public static final UUID RX_CHAR_UUID = UUID.fromString("6e400002-b5a3-f393-e0a9-e50e24dcca9e");
+            //public static final UUID TX_CHAR_UUID = UUID.fromString("6e400003-b5a3-f393-e0a9-e50e24dcca9e");
+
             @Override
             public void onServicesDiscovered(BluetoothGatt gatt, int status) {
                 super.onServicesDiscovered(gatt, status);
-                BluetoothGattService lightControlService = gatt.getService(AssignedNumber.getBleUuid("Light Control"));
+                BluetoothGattService lightControlService = gatt.getService(UUID.fromString("6e400001-b5a3-f393-e0a9-e50e24dcca9e"));
                 if (lightControlService != null) {
                     // Light control services were discovered
-                    lightSwitchWriteCharacteristic = lightControlService.getCharacteristic(AssignedNumber.getBleUuid("Light Switches Write"));
+                    lightSwitchWriteCharacteristic = lightControlService.getCharacteristic(UUID.fromString("6e400002-b5a3-f393-e0a9-e50e24dcca9e"));
                     if (lightSwitchWriteCharacteristic != null) {
-                        Log.i(TAG, "Found light switch characteristic.");
+                        Log.i(TAG, "Found RX characteristic.");
                     } else {
-                        Log.w(TAG, "Can't find light switch write characteristic.");
+                        Log.w(TAG, "Can't find RX characteristic.");
                     }
-                    lightSwitchReadCharacteristic = lightControlService.getCharacteristic(AssignedNumber.getBleUuid("Light Switches Read"));
+                    lightSwitchReadCharacteristic = lightControlService.getCharacteristic(UUID.fromString("6e400003-b5a3-f393-e0a9-e50e24dcca9e"));
                     if (lightSwitchReadCharacteristic != null) {
-                        Log.i(TAG, "Found light switch characteristic.");
+                        Log.i(TAG, "Found TX characteristic.");
                         mGatt.setCharacteristicNotification(lightSwitchReadCharacteristic, true);
                         BluetoothGattDescriptor descriptor = lightSwitchReadCharacteristic.getDescriptor(AssignedNumber.getBleUuid("Client Characteristic Configuration"));
                         descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
                         mGatt.writeDescriptor(descriptor);
                     } else {
-                        Log.w(TAG, "Can't find light switch read characteristic.");
+                        Log.w(TAG, "Can't find TX characteristic.");
                     }
                     runOnUiThread(new Runnable() {
                         @Override
@@ -311,6 +353,7 @@ public class MainActivity extends ActionBarActivity{
                             setInterfaceEnabled(true);
                         }
                     });
+                    timer.schedule(updateInfo, 1000, 1000);
 
                 } else {
                     // Light control services were not discovered
@@ -319,7 +362,7 @@ public class MainActivity extends ActionBarActivity{
                         @Override
                         public void run() {
                             setInterfaceEnabled(false);
-                            Toast.makeText(MainActivity.this, "Can't find Light Controller services", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(MainActivity.this, "Can't find waste bin services", Toast.LENGTH_SHORT).show();
                         }
                     });
                 }
@@ -328,22 +371,32 @@ public class MainActivity extends ActionBarActivity{
             @Override
             public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
                 super.onCharacteristicRead(gatt, characteristic, status);
+
                 Log.i(TAG, "onCharacteristicRead Entered");
             }
 
+
+
             @Override
-            public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
+            public void onCharacteristicChanged(BluetoothGatt gatt, final BluetoothGattCharacteristic characteristic) {
                 super.onCharacteristicChanged(gatt, characteristic);
-                if (characteristic.getUuid().equals(AssignedNumber.getBleUuid("Light Switches Read"))) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+//                        Toast.makeText(MainActivity.this, , Toast.LENGTH_SHORT).show();
+                        mSensorData.setText(characteristic.getStringValue(0));
+                    }
+                });
+                //if (characteristic.getUuid().equals(AssignedNumber.getBleUuid("Trash Level Read"))) {
                     //final int lightSwitchState = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, 0);
-                    final int trashLevel = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, 0);
+                    //final int trashLevel = characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, 0);
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
-                            switch (trashLevel) {
+                            switch (distance) {
                                 case 0:
                                     //if trash level is low, show image with green level bin
-                                    if (trashLevel == 1)
+                                    if (distance > 30)
                                         mLevel1.setImageResource(R.drawable.low);
                                     //lightsOn = false;
                                     //mSwitch2.setChecked(false);
@@ -351,7 +404,7 @@ public class MainActivity extends ActionBarActivity{
 
                                 case 1:
                                     //if trash level is medium,set image to medium bin level image
-                                    if (trashLevel == 2)
+                                    if (distance > 15 && distance < 30)
                                         mLevel1.setImageResource(R.drawable.medium);
                                     //lightsOn = true;
                                     //mSwitch2.setChecked(false);
@@ -359,27 +412,20 @@ public class MainActivity extends ActionBarActivity{
 
                                 case 2:
                                     //if trash level is high, set the image to high level image and also send push notification
-                                    if (trashLevel == 3)
+                                    if (distance < 5)
                                         mLevel1.setImageResource(R.drawable.high);
                                     //lightsOn = false;
                                     //mSwitch2.setChecked(true);
                                     break;
 
-                                case 3:
-                                    mSwitch1.setImageResource(R.drawable.off);
-                                    lightsOn = true;
-                                    //mSwitch2.setChecked(true);
-                                    break;
-
                                 default:
-                                    mSwitch1.setImageResource(R.drawable.on);
-                                    lightsOn = false;
+                                    mLevel1.setImageResource(R.drawable.earth);
                                     //mSwitch2.setChecked(false);
                                     break;
                             }
                         }
                     });
-                }
+                //}
             }
 
             public void onCharacteristicWrite(BluetoothGatt gatt,
@@ -390,21 +436,24 @@ public class MainActivity extends ActionBarActivity{
                     Log.w(TAG, "Write failed with code " + status + ".");
                 }
             }
+
         };
     }
 
     public void onSwitch1Click(View view) {
-        lightSwitchWriteCharacteristic.setValue(new byte[] { 1 });
+        /*
+        lightSwitchWriteCharacteristic.setValue(new byte[]{1});
         if (!mGatt.writeCharacteristic(lightSwitchWriteCharacteristic)) {
             Log.w(TAG, "Failed to write to music characteristic.");
         }
-        if(!lightsOn){
+        if (!lightsOn) {
             mSwitch1.setImageResource(R.drawable.off);
             lightsOn = true;
-        } else{
+        } else {
             mSwitch1.setImageResource(R.drawable.on);
             lightsOn = false;
-        }
+        }*/
+
     }
     /*
     public void onSwitch2Click(View view) {
@@ -419,11 +468,15 @@ public class MainActivity extends ActionBarActivity{
     Enable/disable the app interface
      */
     private void setInterfaceEnabled(boolean enabled) {
+        if(enabled)
+        mWelcome.setImageResource(R.drawable.earth);
+    }
+    /*private void setInterfaceEnabled(boolean enabled) {
         if(!enabled) mSwitch1.setImageResource(R.drawable.disabled);
         else mSwitch1.setImageResource(R.drawable.on);
         mSwitch1.setEnabled(enabled);
         //mSwitch2.setEnabled(enabled);
-    }
+    } */
 
     /*
     Terminate the GATT connection with the light controller

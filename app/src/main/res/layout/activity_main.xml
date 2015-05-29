@@ -7,20 +7,32 @@
     android:orientation="vertical"
     android:gravity="center_horizontal"
     android:clickable="false"
-    android:background="#0000ff00">
+    android:background="#00ffffff">
 
     <ImageButton
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:id="@+id/imageButton"
-        android:layout_alignParentEnd="false"
-        android:layout_centerInParent="true"
-        android:src="@drawable/disabled"
+        android:id="@+id/image"
+        android:src="@drawable/earth"
         android:onClick="onSwitch1Click"
         android:clickable="true"
         android:cropToPadding="false"
         android:adjustViewBounds="false"
-        android:background="#0000ff00"
-        android:contentDescription="@string/lightSwitch1" />
+        android:background="#00000000"
+        android:contentDescription="@string/lightSwitch1"
+        android:layout_centerVertical="true"
+        android:layout_centerHorizontal="true"
+        android:scaleType="fitCenter" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/editText"
+        android:layout_alignTop="@+id/imageButton"
+        android:layout_centerHorizontal="true"
+        android:text="Welcome!"
+        style="@style/Base.TextAppearance.AppCompat.Title"
+        android:height="@dimen/abc_action_button_min_height_material" />
+
 
 </RelativeLayout>
